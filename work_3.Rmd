@@ -1,0 +1,416 @@
+---
+title: "研發與規模的關係"
+output: html_notebook
+---
+
+## 動機
+
+研發，代表需要大量的評估計算與建模。因此，研發會是我們數學人可以大展身手的地方。
+
+那**為什麼台灣仍以代工產業為主？台灣是否缺技術、缺人才?**
+
+2018年，Google以約新台幣330億元，收購HTC手機工程團隊近2千人。其代表
+
+1.  台灣擁有不少的頂尖人才
+
+2.  HTC即使擁有頂尖人才，仍因虧損過多，不得不將人才賣出。
+
+指出**就算有技術人才也不得不限制研發**。因此，我們好奇是否有變因影響，甚至限制研發的上限。
+
+## 猜測
+
+#### 一、研發不合利益－智豬博弈
+
+在長條形豬圈中有大小兩頭豬。豬圈一端有一個豬食槽，豬食槽處需付出２單位豬食作為代價。 ![](images/pig.png){width="600"}
+
+![](https://i2.read01.com/brXKoCyPV_yf3w4vk9MVjoU/0.jpg){width="\"400"}
+
+我們猜測，**研發支出和公司規模呈正相關**
+
+#### 二、研發風險過大-貧窮陷阱
+
+貧窮陷阱源於"貧窮的本質"，其探討窮人為何會窮。
+
+我們認為這概念可以套用到公司上。
+
+公司要維持營運需要一定量的**基礎資金**，一旦資金虧損超過某臨界點，將影響其營運和信用判斷，而大幅降低其獲利能力。
+
+因此當研發虧損超過臨界點時，公司將會**降低研發經費，甚至倒閉**。
+
+![](https://s.yimg.com/os/creatr-uploaded-images/2019-11/17290770-0449-11ea-a6fc-6bcb03f36176){width="473"}
+
+我們猜測，**在近似模型上，會有一塊沒有數值的空白處**
+
+##### 資料擷取自TEJ台灣經濟新報資料庫
+
+# 判斷不同資料公司 對應時間欄位
+
+```{r}
+j1 <- 0
+j2 <- 0
+for (i in 1:3101) {
+  if(x3$公司...2[i]==x3$公司...5[i] &
+     x3$公司...2[i]==x3$公司...8[i] & 
+     x3$公司...2[i]==x3$公司...11[i] ){
+  j1=j1+1}
+}
+print(j1)
+
+for (i in 1:3101) {
+  if( x3$`年/月...3`[i]==x3$`年/月...6`[i] &
+      x3$`年/月...3`[i]==x3$`年/月...9`[i] & 
+      x3$`年/月...3`[i]==x3$`年/月...12`[i] ){
+  j2=j2+1}
+}
+print(j2)
+
+```
+
+把以下4變數資料合併
+
+```{r}
+mat1 <- matrix(1:2940, ncol=6)
+a <- x4$公司
+c <- as.numeric(x4$`研究發展費(千元)`)
+d <- as.numeric(x4$`現金及約當現金(千元)`)
+e <- as.numeric(x4$員工人數)
+f <- as.numeric(x4$總資產報酬成長率)
+for (i in 1:490) {
+    mat1[i, 1] <- a[4*i]
+    mat1[i, 2] <- 2017+((i+4) %% 5)
+    mat1[i, 3] <- c[4*i]
+    mat1[i, 4] <- d[4*i]
+    mat1[i, 5] <- e[4*i]
+    mat1[i, 6] <-  (f[4*(i-1)+1]/100+1)*(f[4*(i-1)+2]/100+1)*(f[4*(i-1)+3]/100+1)*(f[4*(i-1)+4]/100+1) 
+
+}
+#as.data.frame(mat1)
+#View(mat1)
+```
+
+判斷公司資料完整
+
+i.判斷資料的時間間隔
+
+```{r}
+library(zoo)
+
+text_data <- as.Date(as.yearmon(x4$`年/月`,"%Y/%m"))
+day_distance<-array(1959)
+wrong_row<-array(1959)
+j<-0
+c<-96
+for(i in 1:1959){
+  day_distance[i]=text_data[i+1]-text_data[i]
+ if(as.integer(day_distance[i]) > c){
+   wrong_row[j]=i
+   j=j+1
+ }
+}
+View(t(wrong_row))
+```
+
+ii.用package
+
+```{r}
+aa1 <- 1
+aa2 <- c(1:31)
+library(dplyr)
+mat2 <- matrix(rep((1), times=10172), ncol = 1)
+mat3 <- cbind(income1, mat2)
+
+# aggregate
+group <- aggregate(mat3$mat2, list(mat3$公司), FUN=sum)
+for (i in 1:182) {
+  if(group$x[i] != 60){
+    aa2[aa1] <- group$Group.1[i]
+    aa1 = aa1+1
+  }
+}
+group
+aa2
+```
+
+用merge合併
+
+```{r}
+library(dplyr)
+finish <- merge(x44, x11, by="company")
+
+#發現有公司研究發展費為0，取log會出問題，故刪去
+finish <- finish[-c(361:365),]
+```
+
+## 模型測試
+
+## 資料觀察
+
+```{r}
+summary(finish)
+plot(finish)
+```
+
+可以看出資料差距極大，我們有三種轉化策略
+
+1.  標準化
+
+2.  取log
+
+3.  由log觀察其與幾次方呈線性相關(即log關係的係數)，再和該次方取lm
+
+## 資料轉換
+
+```{r}
+
+
+  
+#log
+data_log <- finish
+#data_log_3 <- log(finish)
+data_log[,3]<-log(finish[,3])
+data_log[,4]<-log(finish[,4])
+data_log[,5]<-log(finish[,5])
+data_log[,6]<-log(finish[,6])
+data_log[,7]<-log(finish[,7])
+data_log<-as.data.frame(data_log)
+#print("log")
+is.data.frame(data_log)
+summary(data_log)
+#標準化
+ndia <- finish
+ndia[3:7]<-as.data.frame(scale(finish[3:7]))
+is.data.frame(ndia)
+summary(ndia)
+```
+
+```{r}
+data_row<-nrow(finish)
+subdate<-sample(seq_len(data_row),size = round(0.7*data_row))
+
+
+#finish原資料
+model_data_original <- finish[subdate,]
+test_data_original <-finish[-subdate,]
+model_data_original<-na.omit(model_data_original)
+model_data_original<-as.data.frame(model_data_original)
+test_data_original<-na.omit(test_data_original)
+test_data_original<-as.data.frame(test_data_original)
+
+
+#log切割
+model_data_log <-data_log[subdate,]
+test_data_log <-(data_log[-subdate,])
+model_data_log<-na.omit(model_data_log)
+test_data_log<-as.data.frame(test_data_log)
+test_data_log<-na.omit(test_data_log)
+test_data_log<-as.data.frame(test_data_log)
+summary(test_data_log)
+
+
+
+#標準化
+model_data_ndia <- ndia[1:300,]
+test_data_ndia <-ndia[300:384,]
+model_data_ndia<-na.omit(model_data_ndia)
+test_data_ndia<-na.omit(test_data_ndia)
+model_data_ndia<-as.data.frame(model_data_ndia)
+test_data_ndia<-as.data.frame(test_data_ndia)
+is.data.frame(model_data_ndia)
+summary(model_data_ndia)
+is.data.frame(test_data_ndia)
+summary(test_data_ndia)
+```
+
+## 模型取標準化
+
+```{r}
+reach_money_ndia_ndia<- lm(formula = (model_data_ndia$`研究發展費(千元)`)~( model_data_ndia$`現金及約當現金(千元)`),
+  data = model_data_ndia
+)
+summary(reach_money_ndia_ndia)
+plot(reach_money_ndia_ndia)
+
+```
+
+```{r}
+reach_employee_ndia<- lm(formula = (model_data_ndia$`研究發展費(千元)`)~( model_data_ndia$員工人數),
+  data =model_data_ndia
+)
+summary(reach_employee_ndia)
+plot(reach_employee_ndia)
+
+```
+
+```{r}
+reach_revenue_ndia<- lm(formula = (model_data_ndia$`研究發展費(千元)`)~( model_data_ndia$`年營收(千元)`),
+  data = model_data_ndia
+)
+summary(reach_revenue_ndia)
+plot(reach_revenue_ndia)
+
+```
+
+## 模型取log，並觀察其與幾次方呈線性相關(即log關係的係數)，再由和該次方取lm
+
+```{r}
+#log
+
+
+reach_money_log <- lm(formula = (`研究發展費(千元)`)~( `現金及約當現金(千元)`),
+  data = model_data_log
+)
+summary(reach_money_log )
+plot(reach_money_log )
+
+#colog
+
+reach_money_power<-1
+model_data_money_colog<- model_data_original
+model_data_money_colog$`現金及約當現金(千元)`<-(model_data_money_colog$`現金及約當現金(千元)`)^reach_money_power
+
+model_money_colog <- lm(formula = (`研究發展費(千元)`)~( `現金及約當現金(千元)`),
+  data = model_data_money_colog
+)
+summary(model_money_colog)
+plot(model_money_colog)
+```
+
+```{r}
+#log
+
+
+reach_employee_log <- lm(formula = (`研究發展費(千元)`)~( 員工人數),
+  data = model_data_log
+)
+summary(reach_employee_log )
+plot(reach_employee_log )
+
+
+
+#colog
+
+reach_employee_power<-1
+model_data_employee_colog<- model_data_original
+model_data_employee_colog$員工人數<-(model_data_employee_colog$員工人數)^reach_employee_power
+
+
+reach_employee_colog <- lm(formula = (`研究發展費(千元)`)~( 員工人數),
+  data = model_data_employee_colog
+)
+summary(reach_employee_colog)
+plot(reach_employee_colog)
+```
+
+```{r}
+#log
+
+reach_total_log <- lm(formula = (`研究發展費(千元)`)~( `年營收(千元)`),
+  data = model_data_log
+)
+summary(reach_total_log )
+plot(reach_total_log )
+
+#colog
+
+reach_total_power<-3
+model_data_total_colog<- model_data_original
+model_data_total_colog$`年營收(千元)`<-(model_data_total_colog$`年營收(千元)`)^reach_total_power
+
+model_total_colog <- lm(formula = (`研究發展費(千元)`)~( `年營收(千元)`),
+  data = model_data_total_colog
+)
+summary(model_total_colog)
+plot(model_total_colog)
+```
+
+全變數的模型
+
+```{r}
+
+reach_all_log <- lm(formula = (`研究發展費(千元)`)~( `年營收(千元)`+`現金及約當現金(千元)`+總資產報酬成長率),
+  data = model_data_log
+)
+summary(reach_all_log )
+plot(reach_all_log )
+
+```
+
+#### 因此，決定**取log後作為模型**。
+
+## 圖和均方誤差
+
+```{r warning=TRUE, include=FALSE}
+library(tidyverse)
+```
+
+```{r}
+
+#圖
+ggplot( model_data_log,aes(model_data_log$`研究發展費(千元)`,model_data_log$`現金及約當現金(千元)`  )) +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method=lm)+
+  labs(x="現金及約當現金(千元)_log",y="研究發展費(千元)_log")
+
+#均方誤差
+
+
+reach_money_test<-predict(reach_money_log,test_data_log)
+#view(reach_money_test)
+reach_money_data_test<-mean((reach_money_test-test_data_log$`研究發展費(千元)`)^2)
+print(reach_money_data_test)
+
+
+#圖
+ggplot( model_data_log,aes( model_data_log$`研究發展費(千元)`, model_data_log$員工人數) )+
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method=lm)+
+  labs(x="員工人數_log",y="研究發展費(千元)_log")
+
+#均方誤差
+
+
+reach_employee_test<-predict(reach_employee_log,test_data_log)
+#view(reach_employee_test)
+reach_employee_data_test<-mean((reach_employee_test-test_data_log$`研究發展費(千元)`)^2)
+print(reach_employee_data_test)
+
+#圖
+ggplot( model_data_log,aes( model_data_log$`研究發展費(千元)`, model_data_log$`年營收(千元)`) )+
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method=lm)+
+  labs(x="年營收(千元)_log",y="研究發展費(千元)_log")
+
+#均方誤差
+
+reach_total_test<-predict(reach_total_log,test_data_log)
+#view(reach_total_test)
+reach_total_data_test<-mean((reach_total_test-test_data_log$`研究發展費(千元)`)^2)
+print(reach_total_data_test)
+
+
+
+#均方誤差
+
+reach_all_test<-predict(reach_all_log,test_data_log)
+#view(reach_all_test)
+reach_all_data_test<-mean((reach_all_test-test_all_log$`研究發展費(千元)`)^2)
+print(reach_all_data_test)
+```
+
+# 結論
+
+1.  從圖和模型得知，**應變變數：研究發展費(千元)**和其他變數呈現正相關，符合我們的第一項猜測。
+
+2.  圖中大多數的點聚集在左下角，取log後依然集中，判斷不出空白處位置，因此**第二項猜測無法判斷**。
+
+3.  雖然取log的lm模型呈現的Pr[t]值和$R^2$值與四張圖都很直觀，但模型的均方誤差很大，不是一個很好的模型。
+
+## 工作分配
+
+江陳洤 資料蒐集、程式\
+黃寬勉 資料整理、財務相關分析\
+李柏霖 畫圖分析、程式
+
+## 資料來源
+
+TEJ台灣經濟新報資料庫
